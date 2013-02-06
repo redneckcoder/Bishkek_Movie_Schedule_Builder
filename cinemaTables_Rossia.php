@@ -45,12 +45,13 @@ function parse_to_correct_price($st) {
   }
   return false;
 }
+
 $data = null;
 $st = get_data_string('/tmp/cache_cinema', 'http://cinema.kg/');
 if (preg_match('/new cinema\(([^\)]+)\)/', $st, $matches)) {
-	$data = json_decode($matches[1]);
+  $data = json_decode($matches[1]);
 }
-	
+
 if ($data) {
   try {
     $db = new PDO ('sqlite:movie.sqlite3');
@@ -59,27 +60,27 @@ if ($data) {
     $sql = 'INSERT INTO timeTable ( theaterName,  movieName,  movieDate,  movieTime,  movieHall,  moviePrice,  movieLink)
 								 VALUES (:theaterName, :movieName, :movieDate, :movieTime, :movieHall, :moviePrice, :movieLink)';
     $statement = $db->prepare($sql);
-    $cinemaName = 'Россия';    
-    
-    foreach($data->timetable as $dayInTable) {
-		foreach ($dayInTable as $movieInfo) {
-		  $movieDate = date('Y-m-d', $movieInfo->timestamp/1000);
-		  $movieId = $movieInfo->movieId;
-          $movieName = $data->movies->{$movieId}->title;
-          $movieHall = $movieInfo->hall;
-          $moviePrice = $movieInfo->price;
-          $movieTime = $movieInfo->time;
-          $movieLink = 'http://cinema.kg/ru/movies/?id='.$movieId;
-          $statement->bindParam(':theaterName', $cinemaName);
-          $statement->bindParam(':movieName', $movieName);
-          $statement->bindParam(':movieDate', $movieDate);
-          $statement->bindParam(':movieTime', $movieTime);
-          $statement->bindParam(':movieHall', $movieHall);
-          $statement->bindParam(':moviePrice', $moviePrice);
-          $statement->bindParam(':movieLink', $movieLink);
-          $statement->execute();	
-		}
-	}
+    $cinemaName = 'Россия';
+
+    foreach ($data->timetable as $dayInTable) {
+      foreach ($dayInTable as $movieInfo) {
+        $movieDate = date('Y-m-d', $movieInfo->timestamp / 1000);
+        $movieId = $movieInfo->movieId;
+        $movieName = $data->movies->{$movieId}->title;
+        $movieHall = $movieInfo->hall;
+        $moviePrice = $movieInfo->price;
+        $movieTime = $movieInfo->time;
+        $movieLink = 'http://cinema.kg/ru/movies/?id=' . $movieId;
+        $statement->bindParam(':theaterName', $cinemaName);
+        $statement->bindParam(':movieName', $movieName);
+        $statement->bindParam(':movieDate', $movieDate);
+        $statement->bindParam(':movieTime', $movieTime);
+        $statement->bindParam(':movieHall', $movieHall);
+        $statement->bindParam(':moviePrice', $moviePrice);
+        $statement->bindParam(':movieLink', $movieLink);
+        $statement->execute();
+      }
+    }
     /*
     $result = $db->query('SELECT * FROM timeTable');
     foreach ($result as $row) {
