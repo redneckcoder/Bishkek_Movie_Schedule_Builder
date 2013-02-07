@@ -5,6 +5,8 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+require_once('DB.php');
+
 function curl_get_string($url) {
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
@@ -54,40 +56,24 @@ if (preg_match('/new cinema\(([^\)]+)\)/', $st, $matches)) {
 
 if ($data) {
   try {
-    $db = new PDO ('sqlite:movie.sqlite3');
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $db->exec('CREATE TABLE IF NOT EXISTS timeTable (id INTEGER PRIMARY KEY, theaterName VARCHAR(50), movieName VARCHAR(50), movieDate CHAR(10), movieTime CHAR(5), movieHall VARCHAR(50), moviePrice VARCHAR(10), movieLink VARCHAR(255) ) ');
-    $sql = 'INSERT INTO timeTable ( theaterName,  movieName,  movieDate,  movieTime,  movieHall,  moviePrice,  movieLink)
-								 VALUES (:theaterName, :movieName, :movieDate, :movieTime, :movieHall, :moviePrice, :movieLink)';
-    $statement = $db->prepare($sql);
+    $db = new DB();
     $cinemaName = 'Россия';
 
     foreach ($data->timetable as $dayInTable) {
       foreach ($dayInTable as $movieInfo) {
-        $movieDate = date('Y-m-d', $movieInfo->timestamp / 1000);
         $movieId = $movieInfo->movieId;
-        $movieName = $data->movies->{$movieId}->title;
-        $movieHall = $movieInfo->hall;
-        $moviePrice = $movieInfo->price;
-        $movieTime = $movieInfo->time;
-        $movieLink = 'http://cinema.kg/ru/movies/?id=' . $movieId;
-        $statement->bindParam(':theaterName', $cinemaName);
-        $statement->bindParam(':movieName', $movieName);
-        $statement->bindParam(':movieDate', $movieDate);
-        $statement->bindParam(':movieTime', $movieTime);
-        $statement->bindParam(':movieHall', $movieHall);
-        $statement->bindParam(':moviePrice', $moviePrice);
-        $statement->bindParam(':movieLink', $movieLink);
-        $statement->execute();
+        $dataArray = array();
+        $dataArray['cinemaName'] = $cinemaName;
+        $dataArray['movieDate'] = date('Y-m-d', $movieInfo->timestamp / 1000);
+        $dataArray['movieName'] = $data->movies->{$movieId}->title;
+        $dataArray['movieHall'] = $movieInfo->hall;
+        $dataArray['moviePrice'] = $movieInfo->price;
+        $dataArray['movieTime'] = $movieInfo->time;
+        $dataArray['movieLink'] = 'http://cinema.kg/ru/movies/?id=' . $movieId;
+        $db->insert($dataArray);
       }
     }
-    /*
-    $result = $db->query('SELECT * FROM timeTable');
-    foreach ($result as $row) {
-      var_dump($row);
-    }
-    */
-    $db = null;
+    $db->close();
   } catch (Exception $e) {
     echo($e);
   }

@@ -8,10 +8,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 try {
   $db = new PDO ('sqlite:movie.sqlite3');
   $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-  $result = $db->query('SELECT * FROM timeTable');
+  $result = $db->query("SELECT COUNT(id) FROM timeTable WHERE movieName LIKE '%Зодиак%'");
   foreach ($result as $row) {
     var_dump($row);
   }
+
   $db = null;
 } catch (Exception $e) {
   echo($e);

@@ -5,6 +5,8 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+require_once('DB.php');
+
 function curl_get_string($url) {
   $ch = curl_init();
   curl_setopt($ch, CURLOPT_URL, $url);
@@ -117,21 +119,15 @@ function parse_to_correct_price($st) {
   return false;
 }
 
-$st = get_data_string('/tmp/cache', 'http://m.cinematica.kg');
+$st = get_data_string('/tmp/cache_cinematica', 'http://m.cinematica.kg');
 $xml = simplexml_load_string($st);
 if ($xml) {
   try {
-    $db = new PDO ('sqlite:movie.sqlite3');
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $db->exec('CREATE TABLE IF NOT EXISTS timeTable (id INTEGER PRIMARY KEY, theaterName VARCHAR(50), movieName VARCHAR(50), movieDate CHAR(10), movieTime CHAR(5), movieHall VARCHAR(50), moviePrice VARCHAR(10), movieLink VARCHAR(255) ) ');
-    $sql = 'INSERT INTO timeTable ( theaterName,  movieName,  movieDate,  movieTime,  movieHall,  moviePrice,  movieLink)
-								 VALUES (:theaterName, :movieName, :movieDate, :movieTime, :movieHall, :moviePrice, :movieLink)';
-    $statement = $db->prepare($sql);
+    $db = new DB();
     $theatersCount = count($xml->div);
     for ($th = 1; $th < $theatersCount; $th++) {
       $cinema = $xml->div[$th];
       $cinemaName = (string)$cinema->div[0]->h1;
-      var_dump($cinemaName);
       $timeTableLength = count($cinema->div[1]->div->div);
       for ($i = 0; $i < $timeTableLength; $i++) {
         $dayInTable = $cinema->div[1]->div->div[$i];
@@ -141,29 +137,19 @@ if ($xml) {
         $moviesByDayCount = count($dayInTable->ul->li);
         for ($j = 0; $j < $moviesByDayCount; $j++) {
           $movieInfo = $dayInTable->ul->li[$j];
-          $movieName = (string)$movieInfo->h3->a;
-          $movieHall = (string)$movieInfo->p[0]->a;
-          $moviePrice = parse_to_correct_price((string)$movieInfo->p[1]->a);
-          $movieTime = (string)$movieInfo->p[2]->a;
-          $movieLink = 'http://cinematica.kg' . (string)$movieInfo->a[0]->attributes()->href;
-          $statement->bindParam(':theaterName', $cinemaName);
-          $statement->bindParam(':movieName', $movieName);
-          $statement->bindParam(':movieDate', $movieDate);
-          $statement->bindParam(':movieTime', $movieTime);
-          $statement->bindParam(':movieHall', $movieHall);
-          $statement->bindParam(':moviePrice', $moviePrice);
-          $statement->bindParam(':movieLink', $movieLink);
-          $statement->execute();
+          $dataArray = array();
+          $dataArray['cinemaName'] = $cinemaName;
+          $dataArray['movieDate'] = $movieDate;
+          $dataArray['movieName'] = ((string)$movieInfo->h3->a);
+          $dataArray['movieHall'] = ((string)$movieInfo->p[0]->a);
+          $dataArray['moviePrice'] = parse_to_correct_price((string)$movieInfo->p[1]->a);
+          $dataArray['movieTime'] = ((string)$movieInfo->p[2]->a);
+          $dataArray['movieLink'] = 'http://cinematica.kg' . (string)$movieInfo->a[0]->attributes()->href;
+          $db->insert($dataArray);
         }
       }
     }
-    /*
-    $result = $db->query('SELECT * FROM timeTable');
-    foreach ($result as $row) {
-      var_dump($row);
-    }
-    */
-    $db = null;
+    $db->close();
   } catch (Exception $e) {
     echo($e);
   }
