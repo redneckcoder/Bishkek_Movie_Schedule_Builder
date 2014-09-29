@@ -135,6 +135,9 @@ if ($xml) {
 
         $movieDate = parse_to_correct_date($dayDate);
         $moviesByDayCount = count($dayInTable->ul->li);
+        if ($moviesByDayCount) {
+          $db->clearByCinemaAndDate($cinemaName, $movieDate);
+        }
         for ($j = 0; $j < $moviesByDayCount; $j++) {
           $movieInfo = $dayInTable->ul->li[$j];
           $dataArray = array();

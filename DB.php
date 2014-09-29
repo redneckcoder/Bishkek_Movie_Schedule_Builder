@@ -9,6 +9,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 class DB {
   protected $db;
   protected $statement;
+  protected $clearStatement;
 
   public function __construct() {
     $this->db = new PDO ('sqlite:movie.sqlite3');
@@ -17,10 +18,11 @@ class DB {
     $sql = 'INSERT INTO timeTable ( theaterName,  movieName,  movieDate,  movieTime,  movieHall,  moviePrice,  movieLink)
 								 VALUES (:theaterName, :movieName, :movieDate, :movieTime, :movieHall, :moviePrice, :movieLink)';
     $this->statement = $this->db->prepare($sql);
+    $sql = 'DELETE FROM timeTable WHERE theaterName=:theaterName AND movieDate=:movieDate';
+    $this->clearStatement = $this->db->prepare($sql);
   }
 
   public function insert(Array $data) {
-    var_dump($data);
     $this->statement->bindParam(':theaterName', $data['cinemaName']);
     $this->statement->bindParam(':movieName', $data['movieName']);
     $this->statement->bindParam(':movieDate', $data['movieDate']);
@@ -29,6 +31,12 @@ class DB {
     $this->statement->bindParam(':moviePrice', $data['moviePrice']);
     $this->statement->bindParam(':movieLink', $data['movieLink']);
     $this->statement->execute();
+  }
+
+  public function clearByCinemaAndDate($cinemaName, $movieDate) {
+    $this->clearStatement->bindParam(':theaterName', $cinemaName);
+    $this->clearStatement->bindParam(':movieDate', $movieDate);
+    $this->clearStatement->execute();
   }
 
   public function close() {
