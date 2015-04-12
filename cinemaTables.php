@@ -6,6 +6,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 require_once('DB.php');
+$URL = 'http://www.cinematica.kg';
 
 function curl_get_string($url) {
   $ch = curl_init();
@@ -29,7 +30,8 @@ function strp($string) {
   $config->set('Core.HiddenElements', array('script' => true, 'style' => true, 'embed' => true, 'applet' => true, 'object' => true,));
   $config->set('Cache.SerializerPath', '/tmp');
   //$config->set('HTML.AllowedAttributes', array('a.href'));
-  $config->set('HTML.AllowedElements', array('a', 'div', 'p', 'ul', 'li', 'h3', 'h1'));
+  $config->set('Attr.EnableID', true);
+  $config->set('HTML.AllowedElements', array('a', 'div', 'p', 'h3', 'h1', 'table', 'tr', 'td'));
   //$config->set('AutoFormat.RemoveEmpty', true);
   $purifier = new HTMLPurifier($config);
   $clean_html = $purifier->purify($string);
@@ -54,55 +56,13 @@ function get_stripped_xml_data($st, $filename) {
   $st = substr($st, $b, $e - $b + 7);
   $st = '<html>' . $st . '</html>';
   $stripped = '<html>' . strp($st) . '</html>';
-  $filename1 = $filename . '.stripped';
-  file_put_contents($filename1, $stripped);
   return $stripped;
 }
 
 function parse_to_correct_date($st) {
-  if (preg_match('/(\d+)\s(.+)/', $st, $matches)) {
+  if (preg_match('/(\d+)\.(\d+)/', $st, $matches)) {
     $mday = $matches[1];
-    $mstr = $matches[2];
-    switch ($mstr) {
-      case 'января':
-        $mon = 1;
-        break;
-      case 'февраля':
-        $mon = 2;
-        break;
-      case 'марта':
-        $mon = 3;
-        break;
-      case 'апреля':
-        $mon = 4;
-        break;
-      case 'мая' :
-        $mon = 5;
-        break;
-      case 'июня':
-        $mon = 6;
-        break;
-      case 'июля':
-        $mon = 7;
-        break;
-      case 'августа':
-        $mon = 8;
-        break;
-      case 'сентября':
-        $mon = 9;
-        break;
-      case 'октября':
-        $mon = 10;
-        break;
-      case 'ноября':
-        $mon = 11;
-        break;
-      case 'декабря':
-        $mon = 12;
-        break;
-      default:
-        $mon = 0;
-    }
+    $mon = $matches[2];
     $now = getdate();
     $currYear = $now['year'];
     $d = date('Y-m-d', mktime(0, 0, 0, $mon, $mday, $currYear));
@@ -119,36 +79,38 @@ function parse_to_correct_price($st) {
   return false;
 }
 
-$st = get_data_string('/tmp/cache_cinematica', 'http://m.cinematica.kg');
+$st = get_data_string('/tmp/cache_cinematica', $URL);
 $xml = simplexml_load_string($st);
 if ($xml) {
   try {
     $db = new DB();
-    $theatersCount = count($xml->div);
-    for ($th = 1; $th < $theatersCount; $th++) {
-      $cinema = $xml->div[$th];
-      $cinemaName = (string)$cinema->div[0]->h1;
-      $timeTableLength = count($cinema->div[1]->div->div);
-      for ($i = 0; $i < $timeTableLength; $i++) {
-        $dayInTable = $cinema->div[1]->div->div[$i];
-        $dayDate = (string)$dayInTable->h3;
-
-        $movieDate = parse_to_correct_date($dayDate);
-        $moviesByDayCount = count($dayInTable->ul->li);
-        if ($moviesByDayCount) {
-          $db->clearByCinemaAndDate($cinemaName, $movieDate);
-        }
-        for ($j = 0; $j < $moviesByDayCount; $j++) {
-          $movieInfo = $dayInTable->ul->li[$j];
-          $dataArray = array();
-          $dataArray['cinemaName'] = $cinemaName;
-          $dataArray['movieDate'] = $movieDate;
-          $dataArray['movieName'] = ((string)$movieInfo->h3->a);
-          $dataArray['movieHall'] = ((string)$movieInfo->p[0]->a);
-          $dataArray['moviePrice'] = parse_to_correct_price((string)$movieInfo->p[1]->a);
-          $dataArray['movieTime'] = ((string)$movieInfo->p[2]->a);
-          $dataArray['movieLink'] = 'http://cinematica.kg' . (string)$movieInfo->a[0]->attributes()->href;
-          $db->insert($dataArray);
+    $topNav = $xml->xpath('//div[@id="top-nav"]/a');
+    foreach ($topNav as $cinemaObject) {
+      $cinemaName = (string)$cinemaObject;
+      $cinemaDivId = str_replace('#', '', (string)$cinemaObject['href']);
+      $cinemaDiv = array_pop($xml->xpath("//div[@id='$cinemaDivId']"));
+      if ($cinemaDiv) {
+        $i = 0;
+        foreach ($cinemaDiv->div[0]->a as $date) {
+          $movieDate = parse_to_correct_date((string)$date);
+          $dateItem = $cinemaDiv->div[1]->div[$i]->div->table;
+          if (count($dateItem->tr) > 0) {
+            $db->clearByCinemaAndDate($cinemaName, $movieDate);
+            foreach ($dateItem->tr as $row) {
+              if (count($row->td)) {
+                $dataArray = array();
+                $dataArray['cinemaName'] = $cinemaName;
+                $dataArray['movieDate'] = $movieDate;
+                $dataArray['movieTime'] = ((string)$row->td[0]);
+                $dataArray['movieName'] = ((string)$row->td[1]->a[0]);
+                $dataArray['movieHall'] = ((string)$row->td[3]);
+                $dataArray['moviePrice'] = parse_to_correct_price((string)$row->td[4]);
+                $dataArray['movieLink'] = $URL . (string)$row->td[1]->a[0]->attributes()->href;
+                $db->insert($dataArray);
+              }
+            }
+          }
+          $i++;
         }
       }
     }
