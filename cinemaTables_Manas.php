@@ -6,6 +6,8 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 require_once('DB.php');
+$URL = 'http://manascinema.com';
+$cinemaNames = array('Манас', 'Жал Синема');
 
 function curl_get_string($url) {
   $ch = curl_init();
@@ -61,7 +63,7 @@ function parse_to_correct_price($st) {
 }
 
 function parse_to_resolve_hall_name($st) {
-  $hallNames = array('big' => 'Большой зал', 'blue' => 'Синий зал', 'green' => 'Зелёный зал', 'red' => 'Красный зал', 'retro' => 'Ретро зал', 'aitysh' => 'Айтыш зал', 'zamandash' => 'Замандаш зал');
+  $hallNames = array('big' => 'Большой зал', 'blue' => 'Синий зал', 'green' => 'Зелёный зал', 'red' => 'Красный зал', 'retro' => 'Ретро зал', 'aitysh' => 'Айтыш зал', 'zamandash' => 'Замандаш зал', 'hall9' => 'Зал 1', 'hall10' => 'Зал 2', 'hall11' => 'Зал 3');
   if (array_key_exists($st, $hallNames)) {
     return $hallNames[$st];
   }
@@ -97,18 +99,18 @@ function get_date_intervals($st) {
 }
 
 $dates = null;
-$st = get_data_string('/tmp/cache_manas', 'http://manascinema.kg/ru/seance/');
+$st = get_data_string('/tmp/cache_manas', $URL);
 $dates = get_date_intervals($st);
 
 if ($dates) {
   try {
-    $cinemaName = 'Манас';
     $db = new DB();
-
+    foreach ($cinemaNames as $i => $cinemaName) {
+    $cinemaId = $i + 1;
     foreach ($dates as $timestampInTable) {
       $movieDate = date('Y-m-d', $timestampInTable);
       $dateParam = date('d.m.Y', $timestampInTable);
-      $st = get_data_string_ajax('/tmp/cache_manas_ajax_' . $timestampInTable, 'http://manascinema.kg/ajax.php?mode=afisha_select_date&selDate=' . $dateParam);
+      $st = get_data_string_ajax('/tmp/cache_manas_' . $cinemaId . '_' . $timestampInTable, $URL . '/service/repertuar/index?mode=afisha_select_date&selDate=' . $dateParam . '&cinema_id=' . $cinemaId);
       $timetableData = json_decode($st);
       foreach ($timetableData->hall as $hallName => $hallTimeTable) {
         foreach ($hallTimeTable as $movieInfo) {
@@ -119,12 +121,12 @@ if ($dates) {
           $dataArray['movieHall'] = parse_to_resolve_hall_name($hallName);
           $dataArray['moviePrice'] = parse_to_correct_price($movieInfo->price);
           $dataArray['movieTime'] = $movieInfo->time;
-          $dataArray['movieLink'] = 'http://manascinema.kg/ru/movies/?id=' . $movieInfo->id;
+          $dataArray['movieLink'] = $URL . '/movies/' . $movieInfo->id;
           $db->insert($dataArray);
         }
       }
     }
-    $db->dump();
+    }
     $db->close();
   } catch (Exception $e) {
     echo($e);
